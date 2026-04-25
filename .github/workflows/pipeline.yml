@@ -1,0 +1,48 @@
+name: Market Data ETL Pipeline
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6 hours
+  workflow_dispatch:         # allow manual trigger
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'requirements.txt'
+
+jobs:
+  run-pipeline:
+    name: Run ETL Pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run ETL pipeline
+        working-directory: src
+        env:
+          DB_PATH: ../data/crypto_prices.db
+          LOG_LEVEL: INFO
+        run: python main.py
+
+      - name: Upload data artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pipeline-output-${{ github.run_number }}
+          path: data/
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "Pipeline failed! Check logs above for details."
